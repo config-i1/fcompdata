@@ -28,7 +28,7 @@ mypy src/
 ## Architecture
 
 ```
-src/competitions/
+src/mcomp/
 ├── __init__.py      # Public API exports
 ├── mcomp.py         # Core module (~290 lines)
 └── data/            # JSON data files
@@ -37,12 +37,12 @@ src/competitions/
     └── tcomp_data.json
 ```
 
-**Core classes** (`src/competitions/mcomp.py`):
+**Core classes** (`src/mcomp/mcomp.py`):
 - `MCompSeries`: Single time series with `x` (train), `xx` (test), `h` (horizon), `period`, `type`, `description`
 - `MCompDataset`: Container with dict-like access, supports `subset(series_type)` filtering
 - `_LazyDataset`: Lazy-loading wrapper for module-level datasets
 
-**Public API** (`from competitions import ...`):
+**Public API** (`from mcomp import ...`):
 - `M1`, `M3`, `Tourism`: Lazy-loaded dataset instances
 - `load_m1()`, `load_m3()`, `load_tourism()`: Explicit loader functions
 - `MCompSeries`, `MCompDataset`: Classes for type hints

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "competitions"
+name = "mcomp"
 version = "0.1.0"
 description = "M-Competition time series datasets (M1, M3, Tourism) for Python"
 readme = "README.md"
@@ -43,8 +43,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/competitions"
-Repository = "https://github.com/yourusername/competitions"
+Homepage = "https://github.com/yourusername/mcomp"
+Repository = "https://github.com/yourusername/mcomp"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -52,7 +52,7 @@ include = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/competitions"]
+packages = ["src/mcomp"]
 
 [tool.ruff]
 target-version = "py310"

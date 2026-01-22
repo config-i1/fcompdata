@@ -6,7 +6,7 @@ datasets (M1, M3, Tourism) with an interface similar to R's Mcomp package.
 
 Usage
 -----
->>> from competitions import M1, M3, Tourism
+>>> from mcomp import M1, M3, Tourism
 >>>
 >>> # Access series by 1-based index (R-style)
 >>> series = M3[1]
@@ -28,7 +28,7 @@ Tourism : MCompDataset
     Tourism competition (1311 series)
 """
 
-from competitions.mcomp import (
+from mcomp.mcomp import (
     M1,
     M3,
     MCompDataset,

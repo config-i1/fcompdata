@@ -5,7 +5,7 @@ Loads M1, M3, and Tourism competition datasets from local JSON files,
 providing an interface similar to R's Mcomp package.
 
 Usage:
-    from competitions import M1, M3, Tourism
+    from mcomp import M1, M3, Tourism
 
     # Access series by index (1-based, like R)
     series = M3[2568]
@@ -92,7 +92,7 @@ class MCompDataset:
 
     Examples
     --------
-    >>> from competitions import M3
+    >>> from mcomp import M3
     >>> series = M3[2568]  # 1-based index (R-style)
     >>> print(series['x'])  # Training data
     """
@@ -189,7 +189,7 @@ def _load_json_dataset(filename: str, name: str) -> MCompDataset:
     MCompDataset
         Loaded dataset
     """
-    data_files = resources.files("competitions.data")
+    data_files = resources.files("mcomp.data")
     with resources.as_file(data_files.joinpath(filename)) as filepath:
         with open(filepath, "r") as f:
             data = json.load(f)
@@ -234,7 +234,7 @@ def load_m3() -> MCompDataset:
 
     Examples
     --------
-    >>> from competitions import load_m3
+    >>> from mcomp import load_m3
     >>> M3 = load_m3()
     >>> series = M3[2568]
     >>> print(f"Training length: {len(series['x'])}")
@@ -253,7 +253,7 @@ def load_m1() -> MCompDataset:
 
     Examples
     --------
-    >>> from competitions import load_m1
+    >>> from mcomp import load_m1
     >>> M1 = load_m1()
     >>> series = M1[1]
     >>> print(f"Training length: {len(series['x'])}")
@@ -272,7 +272,7 @@ def load_tourism() -> MCompDataset:
 
     Examples
     --------
-    >>> from competitions import load_tourism
+    >>> from mcomp import load_tourism
     >>> Tourism = load_tourism()
     >>> series = Tourism[1]
     >>> print(f"Training length: {len(series['x'])}")

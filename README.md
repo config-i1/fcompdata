@@ -1,4 +1,4 @@
-# competitions
+# mcomp
 
 Python library for loading M-Competition time series datasets (M1, M3, Tourism) with an interface similar to R's `Mcomp` package.
 
@@ -11,7 +11,7 @@ pip install -e .
 ## Usage
 
 ```python
-from competitions import M1, M3, Tourism
+from mcomp import M1, M3, Tourism
 
 # Access series by 1-based index (R-style)
 series = M3[1]
