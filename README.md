@@ -60,6 +60,26 @@ Each `MCompSeries` object has the following attributes:
 | `type`        | str          | Series type (yearly/quarterly/monthly/other) |
 | `description` | str          | Series description                       |
 
+## Data Sources
+
+The time series data in this package was imported from the following R packages:
+
+- **Mcomp** (M1 and M3 data): Hyndman, R.J. (2024). *Mcomp: Data from the M-Competitions*. R package. [CRAN](https://cran.r-project.org/package=Mcomp), [GitHub](https://github.com/robjhyndman/Mcomp)
+- **Tcomp** (Tourism data): Hyndman, R.J. (2016). *Tcomp: Data from the 2010 Tourism Forecasting Competition*. R package. [CRAN](https://cran.r-project.org/package=Tcomp), [GitHub](https://github.com/robjhyndman/Tcomp)
+
+## References
+
+The datasets correspond to the following forecasting competitions:
+
+**M1 Competition:**
+> Makridakis, S., Andersen, A., Carbone, R., Fildes, R., Hibon, M., Lewandowski, R., Newton, J., Parzen, E., & Winkler, R. (1982). The accuracy of extrapolation (time series) methods: Results of a forecasting competition. *Journal of Forecasting*, 1(2), 111–153. [doi:10.1002/for.3980010202](https://doi.org/10.1002/for.3980010202)
+
+**M3 Competition:**
+> Makridakis, S., & Hibon, M. (2000). The M3-Competition: Results, conclusions and implications. *International Journal of Forecasting*, 16(4), 451–476. [doi:10.1016/S0169-2070(00)00057-1](https://doi.org/10.1016/S0169-2070(00)00057-1)
+
+**Tourism Forecasting Competition:**
+> Athanasopoulos, G., Hyndman, R.J., Song, H., & Wu, D.C. (2011). The tourism forecasting competition. *International Journal of Forecasting*, 27(3), 822–844. [doi:10.1016/j.ijforecast.2010.11.005](https://doi.org/10.1016/j.ijforecast.2010.11.005)
+
 ## License
 
 MIT
