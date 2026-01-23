@@ -5,7 +5,13 @@ Forecasting Competitions Datasets - a Python library for loading M and tourism c
 ## Installation
 
 ```bash
-pip install -e .
+pip install fcompdata
+```
+
+or from github:
+
+```
+pip install git+https://github.com/config-i1/fcompdata
 ```
 
 ## Usage
