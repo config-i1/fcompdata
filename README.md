@@ -1,4 +1,4 @@
-# fcompdata
+7# fcompdata
 
 Forecasting Competitions Datasets - a Python library for loading M and tourism competitions time series datasets (M1, M3, Tourism) with an interface similar to R's `Mcomp` and `Tcomp` packages.
 
@@ -71,7 +71,7 @@ Each `MCompSeries` object has the following attributes:
 The time series data in this package was imported from the following R packages:
 
 - **Mcomp** (M1 and M3 data): Hyndman, R.J. (2024). *Mcomp: Data from the M-Competitions*. R package. [CRAN](https://cran.r-project.org/package=Mcomp), [GitHub](https://github.com/robjhyndman/Mcomp)
-- **Tcomp** (Tourism data): Hyndman, R.J. (2016). *Tcomp: Data from the 2010 Tourism Forecasting Competition*. R package. [CRAN](https://cran.r-project.org/package=Tcomp), [GitHub](https://github.com/robjhyndman/Tcomp)
+- **Tcomp** (Tourism data): Hyndman, R.J. (2016). *Tcomp: Data from the 2010 Tourism Forecasting Competition*. R package. [CRAN](https://cran.r-project.org/package=Tcomp), [GitHub](https://github.com/ellisp/Tcomp-r-package)
 
 ## References
 
