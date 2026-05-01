@@ -149,6 +149,14 @@ class TestMCompSeries:
         assert "MCompSeries" in repr_str
         assert sample_series.sn in repr_str
 
+    def test_series_y_concatenates_x_and_xx(self, sample_series):
+        expected = np.concatenate([sample_series.x, sample_series.xx])
+        assert np.array_equal(sample_series.y, expected)
+        assert len(sample_series.y) == sample_series.n + sample_series.h
+        # Dict-style access works for the property
+        assert np.array_equal(sample_series["y"], expected)
+        assert "y" in sample_series.keys()
+
 
 class TestMCompDataset:
     """Test MCompDataset operations."""
@@ -264,3 +272,132 @@ class TestDownloadModule:
         from fcompdata.download import download_m4
         with pytest.raises(ValueError, match="Unknown frequency"):
             download_m4("invalid")
+
+
+class TestIndividualSeries:
+    """Test the bundled individual time series (AirPassengers, BJsales, Seatbelts, taylor)."""
+
+    def test_imports(self):
+        from fcompdata import (
+            AirPassengers, BJsales, PromoData, Seatbelts, load_individual, taylor,
+        )
+        assert callable(load_individual)
+        for s in (AirPassengers, BJsales, Seatbelts, taylor, PromoData):
+            assert s is not None
+
+    def test_load_individual(self):
+        from fcompdata import load_individual
+        ds = load_individual()
+        assert len(ds) == 5
+        assert {ds[i].sn for i in ds.keys()} == {
+            "AirPassengers", "BJsales", "Seatbelts", "taylor", "PromoData",
+        }
+
+    def test_airpassengers(self):
+        from fcompdata import AirPassengers
+        assert AirPassengers.sn == "AirPassengers"
+        assert AirPassengers.h == 12
+        assert AirPassengers.period == 12
+        assert AirPassengers.type == "monthly"
+        assert AirPassengers.x.shape == (132,)
+        assert AirPassengers.xx.shape == (12,)
+        assert AirPassengers.n == 132
+        assert AirPassengers.xreg is None
+        assert AirPassengers.xregx is None
+        assert AirPassengers.xregxx is None
+        # First training value (R: AirPassengers[1] = 112)
+        assert AirPassengers.x[0] == 112
+
+    def test_bjsales(self):
+        from fcompdata import BJsales
+        assert BJsales.sn == "BJsales"
+        assert BJsales.h == 12
+        assert BJsales.period == 12
+        assert BJsales.type == "monthly"
+        assert BJsales.x.shape == (138,)
+        assert BJsales.xx.shape == (12,)
+        # xreg carries the leading indicator with its R name preserved
+        assert BJsales.xreg is not None
+        assert BJsales.xreg.dtype.names == ("BJsales.lead",)
+        assert len(BJsales.xreg) == 150
+        assert len(BJsales.xregx) == 138
+        assert len(BJsales.xregxx) == 12
+        # First lead value matches R's BJsales.lead[1] = 10.01
+        assert BJsales.xreg["BJsales.lead"][0] == pytest.approx(10.01)
+
+    def test_seatbelts(self):
+        from fcompdata import Seatbelts
+        assert Seatbelts.sn == "Seatbelts"
+        assert Seatbelts.h == 12
+        assert Seatbelts.period == 12
+        assert Seatbelts.type == "monthly"
+        assert Seatbelts.x.shape == (180,)
+        assert Seatbelts.xx.shape == (12,)
+        assert Seatbelts.xreg is not None
+        assert Seatbelts.xreg.dtype.names == ("kms", "PetrolPrice", "law")
+        assert len(Seatbelts.xreg) == 192
+        assert len(Seatbelts.xregx) == 180
+        assert len(Seatbelts.xregxx) == 12
+        # The seat-belt law was in force from Feb 1983; total months under law = 23
+        assert Seatbelts.xreg["law"].sum() == 23.0
+        # Recarray attribute access also works
+        assert np.array_equal(Seatbelts.xreg.kms, Seatbelts.xreg["kms"])
+
+    def test_taylor(self):
+        from fcompdata import taylor
+        assert taylor.sn == "taylor"
+        assert taylor.h == 336
+        assert taylor.period == 336
+        assert taylor.type == "halfhourly"
+        assert taylor.x.shape == (3696,)
+        assert taylor.xx.shape == (336,)
+        assert taylor.xreg is None
+
+    def test_xreg_concat_invariant(self):
+        """xreg must equal the row-wise concatenation of xregx and xregxx."""
+        from fcompdata import BJsales, Seatbelts
+        for s in (BJsales, Seatbelts):
+            assert np.array_equal(
+                s.xreg, np.concatenate([s.xregx, s.xregxx])
+            )
+            # Field names survive the slice
+            assert s.xregx.dtype.names == s.xreg.dtype.names
+            assert s.xregxx.dtype.names == s.xreg.dtype.names
+
+    def test_dict_and_attribute_access_equivalent(self):
+        from fcompdata import AirPassengers, BJsales
+        assert AirPassengers["x"] is AirPassengers.x
+        assert AirPassengers["h"] == AirPassengers.h
+        assert BJsales["xreg"] is BJsales.xreg
+
+    def test_keys_includes_xreg(self):
+        from fcompdata import AirPassengers
+        keys = AirPassengers.keys()
+        for required in ("xreg", "xregx", "xregxx"):
+            assert required in keys
+
+    def test_promodata(self):
+        from fcompdata import PromoData
+        assert PromoData.sn == "PromoData"
+        assert PromoData.h == 13
+        assert PromoData.period == 52
+        assert PromoData.type == "weekly"
+        assert PromoData.x.shape == (143,)
+        assert PromoData.xx.shape == (13,)
+        assert PromoData.xreg is not None
+        assert PromoData.xreg.dtype.names == ("Promo1", "Promo2")
+        assert len(PromoData.xreg) == 156
+        assert len(PromoData.xregx) == 143
+        assert len(PromoData.xregxx) == 13
+        # Promo flags are binary 0/1
+        assert set(np.unique(PromoData.xreg["Promo1"]).tolist()) <= {0.0, 1.0}
+        assert set(np.unique(PromoData.xreg["Promo2"]).tolist()) <= {0.0, 1.0}
+
+    def test_y_property_through_proxy(self):
+        """y must work via the _LazySeries proxy for every individual series."""
+        from fcompdata import AirPassengers, BJsales, PromoData, Seatbelts, taylor
+        for s in (AirPassengers, BJsales, Seatbelts, taylor, PromoData):
+            expected = np.concatenate([s.x, s.xx])
+            assert np.array_equal(s.y, expected), s.sn
+            assert len(s.y) == s.n + s.h, s.sn
+            assert "y" in s.keys(), s.sn

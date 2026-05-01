@@ -28,7 +28,7 @@ import json
 from collections.abc import Iterator
 from importlib import resources
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -46,19 +46,34 @@ class MCompSeries:
         Training data (in-sample)
     xx : NDArray
         Test data (out-of-sample)
+    y : NDArray
+        Full series, equal to ``np.concatenate([x, xx])`` (length ``n + h``).
+        Read-only property, computed on access.
     h : int
         Forecast horizon
     period : int
-        Seasonal period (1=yearly, 4=quarterly, 12=monthly)
+        Seasonal period (1=yearly, 4=quarterly, 12=monthly, 336=half-hourly)
     type : str
-        Series type (yearly, quarterly, monthly, other)
+        Series type (yearly, quarterly, monthly, halfhourly, other)
     n : int
         Length of training data
     description : str
         Series description
+    xreg : numpy.recarray | None
+        Exogenous regressors as a structured array of length ``n + h`` with
+        named fields equal to the column names. ``None`` if the series has
+        no regressors. Equal to the row-wise concatenation of ``xregx`` and
+        ``xregxx``.
+    xregx : numpy.recarray | None
+        Training portion of ``xreg`` (first ``n`` rows). ``None`` if absent.
+    xregxx : numpy.recarray | None
+        Holdout portion of ``xreg`` (last ``h`` rows). ``None`` if absent.
     """
 
-    __slots__ = ("sn", "x", "xx", "h", "period", "type", "n", "description")
+    __slots__ = (
+        "sn", "x", "xx", "h", "period", "type", "n", "description",
+        "xreg", "xregx", "xregxx",
+    )
 
     def __init__(
         self,
@@ -69,6 +84,9 @@ class MCompSeries:
         period: int,
         series_type: str,
         description: str = "",
+        xreg: np.recarray | None = None,
+        xregx: np.recarray | None = None,
+        xregxx: np.recarray | None = None,
     ) -> None:
         self.sn = sn
         self.x = x
@@ -78,6 +96,18 @@ class MCompSeries:
         self.type = series_type
         self.n = len(x)
         self.description = description
+        self.xreg = xreg
+        self.xregx = xregx
+        self.xregxx = xregxx
+
+    @property
+    def y(self) -> NDArray:
+        """Full series: row-wise concatenation of ``x`` (training) and ``xx`` (holdout).
+
+        Computed on each access from the current ``x`` / ``xx``; not stored.
+        Length equals ``n + h``.
+        """
+        return np.concatenate([self.x, self.xx])
 
     def __repr__(self) -> str:
         return f"MCompSeries(sn='{self.sn}', n={self.n}, h={self.h}, type='{self.type}')"
@@ -88,7 +118,10 @@ class MCompSeries:
 
     def keys(self) -> list[str]:
         """Return available keys."""
-        return ["sn", "x", "xx", "h", "period", "type", "n", "description"]
+        return [
+            "sn", "x", "xx", "y", "h", "period", "type", "n", "description",
+            "xreg", "xregx", "xregxx",
+        ]
 
 
 class MCompDataset:
@@ -174,9 +207,24 @@ def _parse_period(period_str: str) -> int:
         "WEEKLY": 1,
         "DAILY": 1,
         "HOURLY": 1,
+        "HALFHOURLY": 336,
         "OTHER": 1,
     }
     return period_map.get(period_str.upper(), 1)
+
+
+def _parse_xreg(xreg_block: dict[str, Any]) -> np.recarray:
+    """Build a numpy structured array (recarray) from a JSON xreg block.
+
+    Expected schema: ``{"names": [...], "values": [[row], ...]}`` (row-major).
+    Field names are preserved verbatim so that R column names like
+    ``"BJsales.lead"`` survive the trip into Python.
+    """
+    names = list(xreg_block["names"])
+    values = xreg_block["values"]
+    dtype = np.dtype([(name, np.float64) for name in names])
+    records = [tuple(float(v) for v in row) for row in values]
+    return np.array(records, dtype=dtype).view(np.recarray)
 
 
 def _parse_series_type(period_str: str) -> str:
@@ -210,9 +258,20 @@ def _load_json_dataset(filename: str, name: str) -> MCompDataset:
         # Extract values - JSON from R has single-element lists for scalars
         sn = item["sn"][0] if isinstance(item["sn"], list) else item["sn"]
         h = item["h"][0] if isinstance(item["h"], list) else item["h"]
-        period_str = item["period"][0] if isinstance(item["period"], list) else item["period"]
-        type_str = item.get("type", [period_str])
-        type_str = type_str[0] if isinstance(type_str, list) else type_str
+        period_raw = item["period"][0] if isinstance(item["period"], list) else item["period"]
+        if isinstance(period_raw, str):
+            # Legacy schema (M1/M3/Tourism): period is a string code; the
+            # competition's `type` field stores the category (DEMOGR, MICRO,
+            # ...) and is unrelated to the frequency type, which we derive
+            # from the period string itself.
+            period_int = _parse_period(period_raw)
+            type_str = _parse_series_type(period_raw)
+        else:
+            # Numeric period (used by the individual series): the JSON
+            # `type` field carries the frequency label (e.g. "weekly").
+            period_int = int(period_raw)
+            type_raw = item.get("type", ["other"])
+            type_str = type_raw[0] if isinstance(type_raw, list) else type_raw
         description = item.get("description", [""])
         description = description[0] if isinstance(description, list) else description
 
@@ -220,14 +279,31 @@ def _load_json_dataset(filename: str, name: str) -> MCompDataset:
         x = np.array(item["x"])
         xx = np.array(item["xx"])
 
+        # Optional exogenous regressors; preserved as a numpy recarray so that
+        # R column names survive (e.g. Seatbelts: kms / PetrolPrice / law).
+        xreg: np.recarray | None = None
+        xregx: np.recarray | None = None
+        xregxx: np.recarray | None = None
+        if "xreg" in item and item["xreg"] is not None:
+            xreg = _parse_xreg(item["xreg"])
+            n_train = len(x)
+            h_int = int(h)
+            # numpy's type stubs widen recarray slices to ndarray, but at
+            # runtime slicing a recarray preserves the recarray type.
+            xregx = cast(np.recarray, xreg[:n_train])
+            xregxx = cast(np.recarray, xreg[-h_int:])
+
         series_dict[idx] = MCompSeries(
             sn=sn,
             x=x,
             xx=xx,
             h=int(h),
-            period=_parse_period(period_str),
-            series_type=_parse_series_type(period_str),
+            period=period_int,
+            series_type=type_str,
             description=description,
+            xreg=xreg,
+            xregx=xregx,
+            xregxx=xregxx,
         )
 
     return MCompDataset(series_dict, name)
@@ -270,6 +346,29 @@ def load_m1() -> MCompDataset:
     >>> print(f"Training length: {len(series['x'])}")
     """
     return _load_json_dataset("m1_data.json", "M1")
+
+
+def load_individual() -> MCompDataset:
+    """
+    Load classic individual time series bundled with the package.
+
+    Returns
+    -------
+    MCompDataset
+        A dataset of four series (1-based indexing):
+        ``1=AirPassengers``, ``2=BJsales``, ``3=Seatbelts``, ``4=taylor``.
+        ``BJsales`` carries the leading indicator ``BJsales.lead`` as a
+        single-column ``xreg``; ``Seatbelts`` uses the ``drivers`` column
+        as the response and ``kms``/``PetrolPrice``/``law`` as ``xreg``.
+
+    Examples
+    --------
+    >>> from fcompdata import load_individual
+    >>> ds = load_individual()
+    >>> ds[1].sn
+    'AirPassengers'
+    """
+    return _load_json_dataset("individual_data.json", "Individual")
 
 
 def load_tourism() -> MCompDataset:
@@ -549,8 +648,53 @@ class _LazyDataset:
         return self._data.subset(series_type)
 
 
+class _LazySeries:
+    """Lazy proxy for a single series inside a (lazily-loaded) MCompDataset.
+
+    Forwards both attribute and dict-style access to the underlying
+    ``MCompSeries``, so ``BJsales.x`` and ``BJsales['x']`` both work
+    identically to a real ``MCompSeries``.
+    """
+
+    __slots__ = ("_dataset", "_index", "_series")
+
+    def __init__(self, dataset: _LazyDataset, index: int) -> None:
+        self._dataset = dataset
+        self._index = index
+        self._series: MCompSeries | None = None
+
+    def _resolve(self) -> MCompSeries:
+        if self._series is None:
+            self._series = self._dataset[self._index]
+        return self._series
+
+    def __getattr__(self, name: str) -> Any:
+        # __getattr__ is only called when normal lookup fails, so the
+        # __slots__ attributes above are handled automatically.
+        return getattr(self._resolve(), name)
+
+    def __getitem__(self, key: str) -> Any:
+        return self._resolve()[key]
+
+    def __repr__(self) -> str:
+        if self._series is None:
+            return f"<MCompSeries proxy (not loaded yet, index={self._index})>"
+        return repr(self._series)
+
+    def keys(self) -> list[str]:
+        return self._resolve().keys()
+
+
 # Module-level lazy datasets for convenient access
 M1 = _LazyDataset(load_m1, "M1")
 M3 = _LazyDataset(load_m3, "M3")
 M4 = _LazyDataset(load_m4, "M4")
 Tourism = _LazyDataset(load_tourism, "Tourism")
+
+# Classic individual series (small, bundled with the package)
+_Individual = _LazyDataset(load_individual, "Individual")
+AirPassengers = _LazySeries(_Individual, 1)
+BJsales = _LazySeries(_Individual, 2)
+Seatbelts = _LazySeries(_Individual, 3)
+taylor = _LazySeries(_Individual, 4)
+PromoData = _LazySeries(_Individual, 5)

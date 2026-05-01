@@ -25,6 +25,7 @@ from fcompdata import M1, M3, Tourism
 series = M3[1]
 print(series['x'])    # Training data (numpy array)
 print(series['xx'])   # Test data (numpy array)
+print(series['y'])    # Full series: concat(x, xx), length n + h
 print(series['h'])    # Forecast horizon
 print(series['n'])    # Training data length
 print(series['type']) # Series type (yearly, quarterly, monthly, other)
@@ -119,6 +120,50 @@ clear_cache()
 clear_cache('m4')
 ```
 
+## Individual Time Series
+
+In addition to the competition datasets, fcompdata bundles several classic
+individual time series ported from base R and the `forecast` package. These
+are tiny, load instantly, and behave like a single `MCompSeries` (`x`, `xx`,
+`h`, `period`, `type`, `description`). Two of them carry exogenous regressors
+on `xreg` / `xregx` / `xregxx`.
+
+| Series          | Origin              | n    | h   | Period | xreg                         |
+|-----------------|---------------------|------|-----|--------|------------------------------|
+| `AirPassengers` | R `datasets`        | 144  | 12  | 12     | —                            |
+| `BJsales`       | R `datasets`        | 150  | 12  | 12     | `BJsales.lead`               |
+| `Seatbelts`     | R `datasets`        | 192  | 12  | 12     | `kms`, `PetrolPrice`, `law`  |
+| `taylor`        | R `forecast`        | 4032 | 336 | 336    | —                            |
+| `PromoData`     | CMAF DFR course     | 156  | 13  | 52     | `Promo1`, `Promo2`           |
+
+```python
+from fcompdata import AirPassengers, BJsales, Seatbelts, taylor
+
+# Same MCompSeries interface as the competition series
+print(AirPassengers.x)         # 132 training observations
+print(AirPassengers.xx)        # 12 holdout observations
+print(AirPassengers.period)    # 12 (monthly)
+
+# Series with exogenous regressors are stored as numpy structured arrays
+# (recarray), so the column names of explanatory variables are preserved:
+print(BJsales.xreg.dtype.names)            # ('BJsales.lead',)
+print(BJsales.xreg['BJsales.lead'][:5])    # first five values
+
+print(Seatbelts.xreg.dtype.names)          # ('kms', 'PetrolPrice', 'law')
+print(Seatbelts.xreg.kms[:5])              # 1-D array, recarray attribute access
+print(Seatbelts.xregxx['law'])             # last 12 values of the law indicator
+
+# xreg is the row-wise concatenation of xregx (training) and xregxx (holdout).
+# To get a plain 2-D float matrix for linear algebra:
+import numpy as np
+mat = np.column_stack([Seatbelts.xreg[n] for n in Seatbelts.xreg.dtype.names])
+```
+
+Note: `BJsales` and `BJsales.lead` have `frequency=1` in R. fcompdata stores
+them with `period=12` and `type='monthly'` to match the requested holdout of
+twelve observations; the original R metadata is documented in the series
+`description`.
+
 ## Datasets
 
 ### Bundled Datasets
@@ -148,11 +193,15 @@ Each `MCompSeries` object has the following attributes:
 | `sn`          | str          | Series name/identifier                   |
 | `x`           | numpy.ndarray| Training data (in-sample)                |
 | `xx`          | numpy.ndarray| Test data (out-of-sample)                |
+| `y`           | numpy.ndarray| Full series: row-wise concatenation of `x` and `xx` (length `n + h`); read-only property |
 | `h`           | int          | Forecast horizon                         |
 | `n`           | int          | Length of training data                  |
 | `period`      | int          | Seasonal period (1, 4, or 12)            |
 | `type`        | str          | Series type (yearly/quarterly/monthly/other) |
 | `description` | str          | Series description                       |
+| `xreg`        | numpy.recarray \| None | Exogenous regressors (length `n + h`) as a structured array with named fields equal to the column names; `None` for series without regressors |
+| `xregx`       | numpy.recarray \| None | Training portion of `xreg` (first `n` rows); `None` if absent |
+| `xregxx`      | numpy.recarray \| None | Holdout portion of `xreg` (last `h` rows); `None` if absent  |
 
 ## Data Sources
 
@@ -161,6 +210,9 @@ The time series data in this package was imported from the following sources:
 - **Mcomp** (M1 and M3 data): Hyndman, R.J. (2024). *Mcomp: Data from the M-Competitions*. R package. [CRAN](https://cran.r-project.org/package=Mcomp), [GitHub](https://github.com/robjhyndman/Mcomp)
 - **Tcomp** (Tourism data): Hyndman, R.J. (2016). *Tcomp: Data from the 2010 Tourism Forecasting Competition*. R package. [CRAN](https://cran.r-project.org/package=Tcomp), [GitHub](https://github.com/ellisp/Tcomp-r-package)
 - **Monash Time Series Forecasting Repository** (M4 data): [forecastingdata.org](https://forecastingdata.org/), hosted on [Zenodo](https://zenodo.org/communities/forecasting)
+- **R `datasets` package** (AirPassengers, BJsales, BJsales.lead, Seatbelts): bundled with base R. [CRAN](https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/00Index.html)
+- **R `forecast` package** (taylor): Hyndman, R.J. (2024). *forecast: Forecasting functions for time series and linear models*. R package. [CRAN](https://cran.r-project.org/package=forecast), [GitHub](https://github.com/robjhyndman/forecast)
+- **CMAF Demand Forecasting course** (PromoData): Svetunkov, I. (2024). *Demand Forecasting course materials* (Session 6.2 — ETS with regressors). [Centre for Marketing Analytics and Forecasting (CMAF)](https://cmaf.lancaster.ac.uk/), Lancaster University Management School.
 
 ## References
 
@@ -180,6 +232,23 @@ The datasets were used in the following forecasting competitions:
 
 **Monash Time Series Forecasting Archive:**
 > Godahewa, R., Bergmeir, C., Webb, G.I., Hyndman, R.J., & Montero-Manso, P. (2021). Monash Time Series Forecasting Archive. *Proceedings of the Neural Information Processing Systems Track on Datasets and Benchmarks* (NeurIPS Datasets and Benchmarks 2021). [arXiv:2105.06643](https://arxiv.org/abs/2105.06643)
+
+The individual time series come from the following original sources:
+
+**AirPassengers:**
+> Box, G. E. P., Jenkins, G. M., Reinsel, G. C., & Ljung, G. M. (2015). *Time Series Analysis, Forecasting and Control* (5th ed.). Wiley. Series G.
+
+**BJsales / BJsales.lead:**
+> Box, G. E. P., & Jenkins, G. M. (1976). *Time Series Analysis, Forecasting and Control*. Holden-Day. Series M.
+
+**Seatbelts:**
+> Harvey, A. C., & Durbin, J. (1986). The effects of seat belt legislation on British road casualties: A case study in structural time series modelling. *Journal of the Royal Statistical Society A*, 149, 187–227. [doi:10.2307/2981553](https://doi.org/10.2307/2981553)
+
+**taylor:**
+> Taylor, J. W. (2003). Short-term electricity demand forecasting using double seasonal exponential smoothing. *Journal of the Operational Research Society*, 54, 799–805. [doi:10.1057/palgrave.jors.2601589](https://doi.org/10.1057/palgrave.jors.2601589)
+
+**PromoData:**
+> Svetunkov, I. (2024). *Demand Forecasting course materials* (Session 6.2 — ETS with regressors). Centre for Marketing Analytics and Forecasting (CMAF), Lancaster University Management School.
 
 ## License
 
