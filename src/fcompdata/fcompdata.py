@@ -25,7 +25,7 @@ Usage:
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from importlib import resources
 from pathlib import Path
 from typing import Any, cast
@@ -78,8 +78,8 @@ class MCompSeries:
     def __init__(
         self,
         sn: str,
-        x: NDArray,
-        xx: NDArray,
+        x: NDArray[Any],
+        xx: NDArray[Any],
         h: int,
         period: int,
         series_type: str,
@@ -101,7 +101,7 @@ class MCompSeries:
         self.xregxx = xregxx
 
     @property
-    def y(self) -> NDArray:
+    def y(self) -> NDArray[Any]:
         """Full series: row-wise concatenation of ``x`` (training) and ``xx`` (holdout).
 
         Computed on each access from the current ``x`` / ``xx``; not stored.
@@ -449,7 +449,7 @@ def _parse_tsf_file(filepath: Path) -> tuple[dict[str, Any], list[dict[str, Any]
                 parts = line.split(":", maxsplit=num_attrs)
 
                 if len(parts) > num_attrs:
-                    series_data = {}
+                    series_data: dict[str, Any] = {}
                     for i, name in enumerate(col_names):
                         series_data[name] = parts[i]
 
@@ -609,26 +609,24 @@ def load_m4(frequency: str | None = None) -> MCompDataset:
 class _LazyDataset:
     """Lazy-loading wrapper for M-competition datasets."""
 
-    def __init__(self, loader: callable, name: str) -> None:
+    def __init__(self, loader: Callable[[], MCompDataset], name: str) -> None:
         self._loader = loader
         self._data: MCompDataset | None = None
         self._name = name
 
-    def _ensure_loaded(self) -> None:
+    def _ensure_loaded(self) -> MCompDataset:
         if self._data is None:
             self._data = self._loader()
+        return self._data
 
     def __getitem__(self, key: int) -> MCompSeries:
-        self._ensure_loaded()
-        return self._data[key]
+        return self._ensure_loaded()[key]
 
     def __len__(self) -> int:
-        self._ensure_loaded()
-        return len(self._data)
+        return len(self._ensure_loaded())
 
     def __iter__(self) -> Iterator[MCompSeries]:
-        self._ensure_loaded()
-        return iter(self._data)
+        return iter(self._ensure_loaded())
 
     def __repr__(self) -> str:
         if self._data is None:
@@ -636,16 +634,13 @@ class _LazyDataset:
         return repr(self._data)
 
     def keys(self) -> list[int]:
-        self._ensure_loaded()
-        return self._data.keys()
+        return self._ensure_loaded().keys()
 
     def items(self) -> Iterator[tuple[int, MCompSeries]]:
-        self._ensure_loaded()
-        return self._data.items()
+        return self._ensure_loaded().items()
 
     def subset(self, series_type: str) -> MCompDataset:
-        self._ensure_loaded()
-        return self._data.subset(series_type)
+        return self._ensure_loaded().subset(series_type)
 
 
 class _LazySeries:

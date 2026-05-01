@@ -48,7 +48,8 @@ PromoData : MCompSeries
     Weekly promotional sales (CMAF Demand Forecasting course workshop).
 """
 
-from importlib.metadata import PackageNotFoundError, version as _version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _version
 
 from fcompdata.fcompdata import (
     M1,

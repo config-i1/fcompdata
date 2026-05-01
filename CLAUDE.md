@@ -25,6 +25,20 @@ ruff check src/
 mypy src/
 ```
 
+## Testing workflow
+
+Before reporting any code change as complete, run all three checks and make sure they pass:
+
+```bash
+ruff check src/   # `ruff check --fix src/` to auto-fix import order etc.
+pytest            # must be 100% green
+mypy src/         # currently clean — keep it that way
+```
+
+CI (`.github/workflows/python-package.yml`) only runs ruff + pytest, but mypy is also expected to be clean.
+
+If a system Python doesn't have the dev tools, use a local venv: `python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"`, then run the binaries via `.venv/bin/ruff` etc.
+
 ## Architecture
 
 ```
