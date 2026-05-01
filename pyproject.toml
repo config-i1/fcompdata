@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fcompdata"
-version = "0.1.1"
+version = "0.1.2"
 description = "Forecasting Competitions Datasets (M1, M3, Tourism) for Python"
 readme = "README.md"
 license = "LGPL-3.0-or-later"

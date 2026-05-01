@@ -48,6 +48,8 @@ PromoData : MCompSeries
     Weekly promotional sales (CMAF Demand Forecasting course workshop).
 """
 
+from importlib.metadata import PackageNotFoundError, version as _version
+
 from fcompdata.fcompdata import (
     M1,
     M3,
@@ -86,4 +88,7 @@ __all__ = [
     "load_individual",
 ]
 
-__version__ = "0.1.0"
+try:
+    __version__ = _version("fcompdata")
+except PackageNotFoundError:
+    __version__ = "0.0.0+unknown"
